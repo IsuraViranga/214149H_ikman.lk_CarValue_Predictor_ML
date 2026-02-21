@@ -67,7 +67,6 @@ Thumbs.db
 .ipynb_checkpoints/
 
 # Model files (optional)
-*.pkl
 *.joblib
 *.h5
 
