@@ -1,0 +1,79 @@
+# =========================
+# Python / Flask
+# =========================
+
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Flask
+instance/
+.webassets-cache
+
+# Logs
+*.log
+
+# Database
+*.db
+*.sqlite3
+
+# Secrets
+.env
+
+# =========================
+# React / Node
+# =========================
+
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Build folders
+build/
+dist/
+
+# React environment
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# =========================
+# VS Code
+# =========================
+
+.vscode/
+
+# =========================
+# OS Files
+# =========================
+
+.DS_Store
+Thumbs.db
+
+# =========================
+# Jupyter / ML
+# =========================
+
+.ipynb_checkpoints/
+
+# Model files (optional)
+*.pkl
+*.joblib
+*.h5
+
+# =========================
+# Temporary files
+# =========================
+
+*.tmp
+*.temp
