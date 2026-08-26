@@ -151,9 +151,13 @@ jobs:
     # this job never starts and nothing reaches production.
     needs: [backend-tests, frontend-build]
 
-    # Pull requests must run the tests but must NOT deploy -- otherwise any
-    # PR would publish straight to the live site.
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    # Deploy on a real push to main, or on a manual "Run workflow" against
+    # main. Pull requests are deliberately excluded -- otherwise any PR would
+    # publish straight to the live site. `needs` above still applies either
+    # way, so a manual deploy cannot skip the tests.
+    if: >-
+      (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+      && github.ref == 'refs/heads/main'
 
     steps:
       - name: Trigger the Render deploy

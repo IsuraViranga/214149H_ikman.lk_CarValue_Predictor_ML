@@ -1,7 +1,7 @@
 """
 db.py — database engine and session handling.
 
-One table for now (users). See models.py. 
+One table for now (users). See models.py.  
 """
 
 import os
