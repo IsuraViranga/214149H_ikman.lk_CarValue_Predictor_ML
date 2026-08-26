@@ -176,39 +176,21 @@ jobs:
           path: build
 
       - name: Publish to Netlify
-        # Uploads the already-built files. Netlify does no building of its
-        # own, which is what lets us switch its git auto-deploy off and still
-        # publish -- the gate is now genuinely the test jobs above.
-        #
-        # netlify-cli authenticates from NETLIFY_AUTH_TOKEN in the environment.
-        #
-        # `deploy` will not pick the target up from NETLIFY_SITE_ID alone --
-        # recent CLI versions renamed sites to "projects" and `deploy` fails
-        # with "Project not found. Please rerun netlify link". Writing the link
-        # file ourselves is what `netlify link` does anyway, and it does not
-        # depend on which flag or env-var name the current CLI expects.
+        # Uses Netlify's JS API directly rather than netlify-cli. The CLI
+        # renamed "sites" to "projects" and its deploy path stopped resolving
+        # NETLIFY_SITE_ID, failing with "Project not found" even though the
+        # same token could list the site. This action does not have that
+        # problem and is the standard way to publish from Actions.
+        uses: nwtgck/actions-netlify@v3.0
+        with:
+          publish-dir: build
+          production-deploy: true
+          deploy-message: "CI ${{ github.sha }}"
+          enable-pull-request-comment: false
+          enable-commit-comment: false
         env:
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
           NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
-        run: |
-          # A secret pasted with a trailing newline breaks the lookup silently.
-          NETLIFY_AUTH_TOKEN="$(printf '%s' "$NETLIFY_AUTH_TOKEN" | tr -d '[:space:]')"
-          NETLIFY_SITE_ID="$(printf '%s' "$NETLIFY_SITE_ID" | tr -d '[:space:]')"
-          # Both names, so either CLI generation finds it.
-          export NETLIFY_AUTH_TOKEN NETLIFY_SITE_ID
-          export NETLIFY_PROJECT_ID="$NETLIFY_SITE_ID"
-
-          # Let the CLI write its own link file. Writing .netlify/state.json by
-          # hand does not work: the key name differs between CLI generations,
-          # and a file it cannot parse makes `link` report "already linked to
-          # undefined" and skip doing the real thing.
-          rm -rf .netlify
-
-          # No `|| true` here -- if linking fails, the deploy cannot work, and
-          # the link error is far more informative than "Project not found".
-          npx --yes netlify-cli link --id "$NETLIFY_SITE_ID"
-
-          npx --yes netlify-cli deploy --prod --dir=build --message "CI ${{ github.sha }}"
 
       - name: Summary
         run: |
