@@ -113,8 +113,69 @@ jobs:
       - name: Build
         working-directory: app/frontend
         env:
-          # Netlify sets CI=true, which makes Create React App treat warnings
-          # as errors. Match netlify.toml so a build that passes here also
-          # passes there.
+          # CRA treats warnings as errors when CI=true. Match netlify.toml.
           CI: "false"
+          # Baked into the bundle at build time -- the browser cannot read
+          # container env vars, so this must be set here, not at deploy.
+          REACT_APP_API_URL: https://carvalue-api-mv6s.onrender.com/api
         run: npm run build
+
+      - name: Upload the built site
+        # An "artifact" hands files from one job to another. Jobs run on
+        # separate machines with separate disks, so this is the only way the
+        # deploy job can see what this job produced -- and it means the site
+        # is built exactly once, not rebuilt for the deploy.
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-build
+          path: app/frontend/build
+          retention-days: 1
+
+  # ---------------------------------------------------------------------
+  # Deploy: only reached when BOTH test jobs succeeded.
+  #
+  # Render and Netlify auto-deploy is switched OFF; this job triggers them
+  # instead, which is what makes the tests an actual gate rather than a
+  # report that arrives alongside a deploy already in progress.
+  # ---------------------------------------------------------------------
+  deploy:
+    name: Deploy
+    runs-on: ubuntu-latest
+
+    # `needs` makes this wait for both jobs. If either fails or is cancelled,
+    # this job never starts and nothing reaches production.
+    needs: [backend-tests, frontend-build]
+
+    # Pull requests must run the tests but must NOT deploy -- otherwise any
+    # PR would publish straight to the live site.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Trigger the Render deploy
+        # -f makes curl exit non-zero on an HTTP error, so a rejected hook
+        # fails this job instead of silently "succeeding".
+        # -o /dev/null keeps the response body out of the log; the hook URL
+        # is a secret and GitHub masks it, but there is no reason to echo it.
+        run: |
+          curl -fsS -X POST "${{ secrets.RENDER_DEPLOY_HOOK }}" -o /dev/null
+          echo "Render deploy triggered"
+
+      - name: Fetch the built site from the frontend job
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-build
+          path: build
+
+      - name: Publish to Netlify
+        # Uploads the already-built files. Netlify does no building of its
+        # own, which is what lets us switch its git auto-deploy off and still
+        # publish -- the gate is now genuinely the test jobs above.
+        run: |
+          npx --yes netlify-cli@17 deploy             --prod             --dir=build             --site "${{ secrets.NETLIFY_SITE_ID }}"             --auth "${{ secrets.NETLIFY_AUTH_TOKEN }}"             --message "CI ${{ github.sha }}"
+
+      - name: Summary
+        run: |
+          echo "### Deployed :rocket:" >> $GITHUB_STEP_SUMMARY
+          echo "Tests passed, so both deploys were triggered." >> $GITHUB_STEP_SUMMARY
+          echo "- Backend: https://carvalue-api-mv6s.onrender.com" >> $GITHUB_STEP_SUMMARY
+          echo "- Frontend: https://carvalue-lk.netlify.app" >> $GITHUB_STEP_SUMMARY
