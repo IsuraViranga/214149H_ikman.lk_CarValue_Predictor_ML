@@ -1,0 +1,7 @@
+# SPA fallback. Create React App copies everything in public/ into build/,
+# so this ends up inside the published directory where Netlify reads it.
+#
+# netlify.toml is NOT used any more: CI builds the site and uploads the
+# finished files, so Netlify never runs a build and never parses that file.
+# Same purpose as try_files in nginx.conf for the Docker image.
+/*    /index.html   200
