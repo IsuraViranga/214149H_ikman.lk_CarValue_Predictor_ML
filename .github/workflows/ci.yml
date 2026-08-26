@@ -179,7 +179,29 @@ jobs:
         # Uploads the already-built files. Netlify does no building of its
         # own, which is what lets us switch its git auto-deploy off and still
         # publish -- the gate is now genuinely the test jobs above.
-        run: npx --yes netlify-cli@17 deploy --prod --dir=build --site "${{ secrets.NETLIFY_SITE_ID }}" --auth "${{ secrets.NETLIFY_AUTH_TOKEN }}" --message "CI ${{ github.sha }}"
+        #
+        # netlify-cli reads NETLIFY_AUTH_TOKEN and NETLIFY_SITE_ID from the
+        # environment. That is the documented CI usage and avoids passing
+        # credentials as command-line flags.
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
+        run: |
+          # A secret pasted with a trailing newline or space silently breaks
+          # the site lookup with "Site not found", so strip whitespace first.
+          NETLIFY_AUTH_TOKEN="$(printf '%s' "$NETLIFY_AUTH_TOKEN" | tr -d '[:space:]')"
+          NETLIFY_SITE_ID="$(printf '%s' "$NETLIFY_SITE_ID" | tr -d '[:space:]')"
+          export NETLIFY_AUTH_TOKEN NETLIFY_SITE_ID
+
+          # Lengths only -- never the values. A site ID is a 36-char UUID.
+          echo "site id length: ${#NETLIFY_SITE_ID} (expect 36)"
+          echo "auth token length: ${#NETLIFY_AUTH_TOKEN}"
+
+          echo "--- sites this token can see ---"
+          npx --yes netlify-cli sites:list || echo "(sites:list failed)"
+
+          echo "--- deploying ---"
+          npx --yes netlify-cli deploy --prod --dir=build --message "CI ${{ github.sha }}"
 
       - name: Summary
         run: |
