@@ -170,8 +170,7 @@ jobs:
         # Uploads the already-built files. Netlify does no building of its
         # own, which is what lets us switch its git auto-deploy off and still
         # publish -- the gate is now genuinely the test jobs above.
-        run: |
-          npx --yes netlify-cli@17 deploy             --prod             --dir=build             --site "${{ secrets.NETLIFY_SITE_ID }}"             --auth "${{ secrets.NETLIFY_AUTH_TOKEN }}"             --message "CI ${{ github.sha }}"
+        run: npx --yes netlify-cli@17 deploy --prod --dir=build --site "${{ secrets.NETLIFY_SITE_ID }}" --auth "${{ secrets.NETLIFY_AUTH_TOKEN }}" --message "CI ${{ github.sha }}"
 
       - name: Summary
         run: |
