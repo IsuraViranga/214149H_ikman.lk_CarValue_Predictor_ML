@@ -1,0 +1,5 @@
+# Test-only dependencies.
+# Kept out of requirements.txt so pytest never ships inside the 1.89 GB
+# production image. CI installs both files; the Dockerfile installs only one.
+-r requirements.txt
+pytest==8.4.2

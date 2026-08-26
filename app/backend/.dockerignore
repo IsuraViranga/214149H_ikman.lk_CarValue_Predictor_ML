@@ -5,3 +5,9 @@ __pycache__/
 .env
 venv/
 env/
+
+# Tests never ship in the production image. CI runs them directly on the
+# runner, and locally they run via a bind mount (see below).
+tests/
+requirements-dev.txt
+.pytest_cache/

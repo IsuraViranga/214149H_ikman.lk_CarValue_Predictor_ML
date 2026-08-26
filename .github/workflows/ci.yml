@@ -1,0 +1,116 @@
+# CI pipeline for CarValueLK.
+#
+# Runs on every push to main and on every pull request. The two test jobs run
+# in parallel on separate machines, so the wall-clock time is the slower of the
+# two rather than the sum.
+#
+# The deploy job is added in 4d, once this is proven to go both green and red.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# If you push twice quickly, cancel the older run instead of paying for both.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ---------------------------------------------------------------------
+  # Backend: pytest against a real Postgres, matching production.
+  # ---------------------------------------------------------------------
+  backend-tests:
+    name: Backend tests
+    runs-on: ubuntu-latest
+
+    # A "service container" is a sidecar that GitHub starts alongside the job
+    # and tears down after. Same postgres:16-alpine as docker-compose, so the
+    # tests hit the same engine version locally and in CI.
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: carvalue
+          POSTGRES_PASSWORD: carvalue
+          POSTGRES_DB: carvalue
+        ports:
+          - 5432:5432
+        # The job must not start querying before Postgres is accepting
+        # connections -- the same readiness problem docker-compose solves
+        # with depends_on: condition: service_healthy.
+        options: >-
+          --health-cmd "pg_isready -U carvalue"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          # Same minor version as the Dockerfile's python:3.11-slim.
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: app/backend/requirements-dev.txt
+
+      - name: Install the OpenMP runtime
+        # XGBoost is compiled against OpenMP and fails to import without
+        # libgomp.so.1 -- the same reason the Dockerfile installs libgomp1.
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq libgomp1
+
+      - name: Install dependencies
+        working-directory: app/backend
+        # requirements-dev.txt starts with "-r requirements.txt", so this
+        # installs the production pins plus pytest.
+        run: pip install --no-cache-dir -r requirements-dev.txt
+
+      - name: Run tests
+        working-directory: app/backend
+        env:
+          # conftest.py appends /carvalue_test and creates that database.
+          # localhost here, not "db" -- service containers are published onto
+          # the runner's own network, unlike compose's private DNS.
+          TEST_DATABASE_BASE: postgresql://carvalue:carvalue@localhost:5432
+        run: python -m pytest tests -q
+
+  # ---------------------------------------------------------------------
+  # Frontend: the production build must actually compile.
+  # ---------------------------------------------------------------------
+  frontend-build:
+    name: Frontend build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node 20
+        uses: actions/setup-node@v4
+        with:
+          # Matches the frontend Dockerfile and netlify.toml.
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: app/frontend/package-lock.json
+
+      - name: Install from the lockfile
+        working-directory: app/frontend
+        # npm ci, not npm install: it refuses to run if package.json and
+        # package-lock.json disagree. This is exactly the check that would
+        # have caught the typescript@5.9.3 conflict before it reached Docker.
+        run: npm ci
+
+      - name: Build
+        working-directory: app/frontend
+        env:
+          # Netlify sets CI=true, which makes Create React App treat warnings
+          # as errors. Match netlify.toml so a build that passes here also
+          # passes there.
+          CI: "false"
+        run: npm run build

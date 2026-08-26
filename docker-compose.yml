@@ -17,7 +17,9 @@ services:
       DATABASE_URL: postgresql://carvalue:carvalue@db:5432/carvalue
       # Local throwaway value. Production uses a strong random secret set
       # only in Render's dashboard -- anyone holding it can forge tokens.
-      JWT_SECRET_KEY: dev-secret-not-for-production
+      # Local only. Production sets a 256-bit random value in the Render
+      # dashboard. >= 32 bytes to satisfy RFC 7518 for HMAC-SHA256.
+      JWT_SECRET_KEY: dev-secret-not-for-production-local-development-only
     healthcheck:
       # Confirms Flask is up AND the .pkl artifacts deserialized
       test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:5000/api/health')\""]
