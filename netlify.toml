@@ -1,0 +1,29 @@
+# Netlify build config for the React frontend.
+# Netlify does NOT use app/frontend/Dockerfile — it runs the build
+# itself and serves the output from its CDN.
+
+[build]
+  # Everything below is relative to this directory.
+  base    = "app/frontend"
+  command = "npm ci && npm run build"
+  publish = "build"
+
+[build.environment]
+  # Match the Node major version used in the Dockerfile so local
+  # and Netlify builds resolve identical dependency trees.
+  NODE_VERSION = "20"
+  # CRA treats warnings as errors on CI unless this is set.
+  CI = "false"
+
+# Single-page-app fallback. Same purpose as `try_files` in nginx.conf:
+# a direct hit on /login must serve index.html so React Router can
+# handle it, instead of returning 404. Needed from Step 3 onward.
+[[redirects]]
+  from   = "/*"
+  to     = "/index.html"
+  status = 200
+
+# NOTE: REACT_APP_API_URL is set in the Netlify dashboard
+# (Site settings > Environment variables), not here — the Render URL
+# does not exist until the backend is deployed. It is read at BUILD
+# time, so changing it requires a redeploy, not just a restart.

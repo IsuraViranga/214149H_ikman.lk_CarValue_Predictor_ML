@@ -1,0 +1,32 @@
+# Render Blueprint — infrastructure as code for the Flask API.
+# Render reads this on "New > Blueprint" and provisions the service from it.
+services:
+  - type: web
+    name: carvalue-api
+    runtime: docker
+
+    # Free tier: 512 MB RAM, spins down after ~15 min idle.
+    plan: free
+
+    # Closest region to Sri Lanka. Change to `oregon` or `frankfurt`
+    # if Singapore is unavailable on the free plan.
+    region: singapore
+
+    # Build only the backend folder, using the Dockerfile we already
+    # verified locally. dockerContext scopes the build context so the
+    # CSVs and notebooks elsewhere in the repo are never uploaded.
+    dockerfilePath: ./app/backend/Dockerfile
+    dockerContext: ./app/backend
+
+    # Render probes this after deploy and on every restart. It returns
+    # len(FEATURES), so a pass proves the .pkl artifacts deserialized.
+    healthCheckPath: /api/health
+
+    envVars:
+      # Netlify origin allowed to call this API.
+      # sync: false = do NOT store the value in git; set it in the
+      # Render dashboard once the Netlify URL exists.
+      - key: CORS_ORIGINS
+        sync: false
+
+    autoDeploy: true
