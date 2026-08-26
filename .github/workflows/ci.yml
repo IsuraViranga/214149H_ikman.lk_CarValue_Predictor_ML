@@ -198,11 +198,15 @@ jobs:
           export NETLIFY_AUTH_TOKEN NETLIFY_SITE_ID
           export NETLIFY_PROJECT_ID="$NETLIFY_SITE_ID"
 
-          # Pre-link this directory to the site, the way `netlify link` would.
-          mkdir -p .netlify
-          printf '{"siteId":"%s"}' "$NETLIFY_SITE_ID" > .netlify/state.json
+          # Let the CLI write its own link file. Writing .netlify/state.json by
+          # hand does not work: the key name differs between CLI generations,
+          # and a file it cannot parse makes `link` report "already linked to
+          # undefined" and skip doing the real thing.
+          rm -rf .netlify
 
-          npx --yes netlify-cli link --id "$NETLIFY_SITE_ID" || echo "(link step skipped)"
+          # No `|| true` here -- if linking fails, the deploy cannot work, and
+          # the link error is far more informative than "Project not found".
+          npx --yes netlify-cli link --id "$NETLIFY_SITE_ID"
 
           npx --yes netlify-cli deploy --prod --dir=build --message "CI ${{ github.sha }}"
 
