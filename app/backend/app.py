@@ -188,7 +188,9 @@ def get_options():
 
 
 @app.route("/api/predict", methods=["POST"])
-@jwt_required()          # AUTHENTICATION: any logged-in user -> 401 without a token
+# @jwt_required()   <-- DELIBERATELY REMOVED to demonstrate that CI catches a
+#                       regression that drops an auth gate. THIS BRANCH MUST
+#                       NOT BE MERGED. Restore this line before merging.
 def predict():
     try:
         data = request.get_json()
