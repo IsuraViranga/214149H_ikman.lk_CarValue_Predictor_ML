@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
+import { apiFetch, API } from "./api";
 
-const API = process.env.REACT_APP_API_URL || "http://localhost:5000/api";
 
 // Utility
 const fmt = (n) => `Rs ${Number(n).toLocaleString("en-LK")}`;
@@ -154,16 +154,16 @@ export default function App() {
     setResult(null);
     setAnimIn(false);
     try {
-      const res = await fetch(`${API}/predict`, {
+      // apiFetch attaches "Authorization: Bearer <token>" and, on a 401,
+      // clears the token and signals AuthContext to show the login screen.
+      const data = await apiFetch("/predict", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           brand, model: carModel, condition, transmission,
           body_type: bodyType, fuel_type: fuelType, district,
           year, mileage_km: mileage, engine_cc: engineCC, has_trim: hasTrim,
         }),
       });
-      const data = await res.json();
       if (!data.success) throw new Error(data.error);
       setResult(data);
       setTimeout(() => setAnimIn(true), 50);

@@ -6,14 +6,50 @@ Endpoints:
   POST /api/predict      — accepts car features, returns price + explanation
 """
 
+from datetime import timedelta
+
 from flask import Flask, request, jsonify
 from flask_cors import CORS
+from flask_jwt_extended import JWTManager, get_jwt, get_jwt_identity, jwt_required
 import os, pickle, warnings, numpy as np, pandas as pd
 from sklearn.preprocessing import LabelEncoder
+
+from auth import auth_bp, role_required
+from db import get_session, init_db
+from models import User
 
 warnings.filterwarnings("ignore")
  
 app = Flask(__name__)
+
+# JWT configuration
+# The secret signs and verifies every token. Anyone holding it can forge a
+# token for any user, so production must set a strong random value in the
+# Render dashboard -- never in git.
+app.config["JWT_SECRET_KEY"] = os.environ.get(
+    "JWT_SECRET_KEY", "dev-secret-not-for-production"
+)
+# 8 hours: long enough to avoid mid-session logouts without a refresh-token
+# flow, short enough that a leaked token is not useful for long.
+app.config["JWT_ACCESS_TOKEN_EXPIRES"] = timedelta(hours=8)
+jwt = JWTManager(app)
+
+
+# Return clean JSON for token problems instead of the library defaults,
+# so the frontend can distinguish "log in again" from other failures.
+@jwt.expired_token_loader
+def _expired(_hdr, _payload):
+    return jsonify({"error": "Token expired", "code": "token_expired"}), 401
+
+
+@jwt.invalid_token_loader
+def _invalid(reason):
+    return jsonify({"error": "Invalid token", "detail": str(reason)}), 401
+
+
+@jwt.unauthorized_loader
+def _missing(reason):
+    return jsonify({"error": "Authorization required", "detail": str(reason)}), 401
 
 # Comma-separated list of allowed frontend origins (set in docker-compose / Render)
 CORS_ORIGINS = [
@@ -22,6 +58,12 @@ CORS_ORIGINS = [
     ).split(",") if o.strip()
 ]
 CORS(app, resources={r"/api/*": {"origins": CORS_ORIGINS}})
+
+# Auth routes live in their own blueprint to keep this file focused on the model.
+app.register_blueprint(auth_bp)
+
+# Create the users table if it is missing. Safe on every boot.
+init_db()
 
 # Load model artifacts 
 with open("model.pkl", "rb") as f:
@@ -146,6 +188,7 @@ def get_options():
 
 
 @app.route("/api/predict", methods=["POST"])
+@jwt_required()          # AUTHENTICATION: any logged-in user -> 401 without a token
 def predict():
     try:
         data = request.get_json()
@@ -259,6 +302,35 @@ def predict():
 
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route("/api/admin/users", methods=["GET"])
+@role_required("admin")  # AUTHORIZATION: role claim must be admin -> 403 otherwise
+def list_users():
+    """Every registered account. Admin only.
+
+    Contrast with /api/predict above: both require a valid token, but this one
+    additionally checks *what* the caller is allowed to do. A normal user gets
+    200 there and 403 here with the exact same token.
+    """
+    with get_session() as session:
+        users = session.query(User).order_by(User.created_at.desc()).all()
+        return jsonify({
+            "count": len(users),
+            "users": [u.to_dict() for u in users],   # to_dict omits password_hash
+        })
+
+
+@app.route("/api/whoami", methods=["GET"])
+@jwt_required()
+def whoami():
+    """Small helper for the viva: shows identity and role straight from the token."""
+    return jsonify({
+        "user_id": get_jwt_identity(),
+        "role": get_jwt().get("role"),
+        "email": get_jwt().get("email"),
+        "source": "read from the JWT itself - no database query",
+    })
 
 
 if __name__ == "__main__":

@@ -5,3 +5,9 @@ scikit-learn==1.6.1
 pandas==2.3.1
 numpy==2.3.2
 gunicorn==23.0.0
+
+# Auth + database (Step 3)
+sqlalchemy==2.0.52
+psycopg2-binary==2.9.12
+bcrypt==5.0.0
+flask-jwt-extended==4.7.4
