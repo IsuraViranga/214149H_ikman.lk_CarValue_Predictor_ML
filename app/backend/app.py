@@ -8,13 +8,20 @@ Endpoints:
 
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-import pickle, warnings, numpy as np, pandas as pd
+import os, pickle, warnings, numpy as np, pandas as pd
 from sklearn.preprocessing import LabelEncoder
 
 warnings.filterwarnings("ignore")
  
 app = Flask(__name__)
-CORS(app)
+
+# Comma-separated list of allowed frontend origins (set in docker-compose / Render)
+CORS_ORIGINS = [
+    o.strip() for o in os.environ.get(
+        "CORS_ORIGINS", "http://localhost:3000"
+    ).split(",") if o.strip()
+]
+CORS(app, resources={r"/api/*": {"origins": CORS_ORIGINS}})
 
 # Load model artifacts 
 with open("model.pkl", "rb") as f:
@@ -95,6 +102,12 @@ FEATURE_MEDIANS = {
 
 
 # Routes
+
+@app.route("/api/health", methods=["GET"])
+def health():
+    """Liveness probe — confirms the model artifacts loaded."""
+    return jsonify({"status": "ok", "features": len(FEATURES)})
+
 
 @app.route("/api/options", methods=["GET"])
 def get_options():
@@ -249,6 +262,9 @@ def predict():
 
 
 if __name__ == "__main__":
+    # Local dev only. In Docker/production gunicorn imports `app` directly.
+    port = int(os.environ.get("PORT", 5000))
+    debug = os.environ.get("FLASK_DEBUG", "0") == "1"
     print("🚗  Vehicle Price Predictor — Flask API")
-    print("    Running on http://localhost:5000")
-    app.run(debug=True, port=5000)
+    print(f"    Running on http://localhost:{port}")
+    app.run(debug=debug, host="0.0.0.0", port=port)
