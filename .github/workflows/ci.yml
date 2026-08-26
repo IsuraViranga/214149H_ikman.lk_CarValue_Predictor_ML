@@ -69,7 +69,11 @@ jobs:
         working-directory: app/backend
         # requirements-dev.txt starts with "-r requirements.txt", so this
         # installs the production pins plus pytest.
-        run: pip install --no-cache-dir -r requirements-dev.txt
+        #
+        # NOTE: no --no-cache-dir here, unlike the Dockerfile. There the flag
+        # keeps the image small; here it would defeat `cache: pip` above and
+        # make the post-job cache step fail with an empty cache folder.
+        run: pip install -r requirements-dev.txt
 
       - name: Run tests
         working-directory: app/backend
