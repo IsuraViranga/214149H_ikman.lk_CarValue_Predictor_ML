@@ -13,6 +13,11 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  # Lets you start a run by hand from the Actions tab ("Run workflow").
+  # Useful when an event fails to fire, and for re-running against a branch
+  # without pushing an empty commit. Only appears once this file is on the
+  # default branch -- GitHub reads the button's definition from there.
+  workflow_dispatch:
 
 # If you push twice quickly, cancel the older run instead of paying for both.
 concurrency:
